@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-baoyu-xhs-images: 小红书图片生成器
-简化版 - 基于 baoyu-skills 改造
+xhs-x-images: 小红书图片生成器
+支持 Google Imagen API
 """
 
 import os
 import sys
 import json
 import argparse
-import subprocess
-import re
+import urllib.request
+import urllib.parse
+import base64
+import time
 
 # 风格到提示词的映射
 STYLE_PROMPTS = {
@@ -20,7 +23,7 @@ STYLE_PROMPTS = {
     "minimal": "极简精致风格，黑白灰，简约设计，线条简洁，现代感，高级感",
     "retro": "复古怀旧风格，复古配色，怀旧元素，80/90年代，复古滤镜",
     "pop": "活泼醒目风格，鲜艳配色，波普艺术，潮流元素，充满活力",
-    "notion": "简约手绘风格，白底黑线，手绘插画，知识感，效率风格，Notion风格",
+    "notion": "简约手栏风格，白底黑线，手绘插画，知识感，效率风格",
     "chalkboard": "粉笔风格，黑板背景，彩色粉笔字，手写字体，教育感",
 }
 
@@ -35,111 +38,247 @@ LAYOUT_PROMPTS = {
 }
 
 def parse_args():
-    """解析命令行参数"""
-    parser = argparse.ArgumentParser(description="小红书图片生成器")
-    parser.add_argument("--topic", "-t", help="主题内容")
-    parser.add_argument("--style", "-s", default="cute", help="视觉风格")
-    parser.add_argument("--layout", "-l", default="balanced", help="布局方式")
-    parser.add_argument("--output", "-o", help="输出文件路径")
-    parser.add_argument("--api", default="google", choices=["google", "openai", "dashscope"], help="API提供商")
+    parser = argparse.ArgumentParser(description="XHS Image Generator")
+    parser.add_argument("--topic", "-t", help="Topic")
+    parser.add_argument("--style", "-s", default="cute", help="Style")
+    parser.add_argument("--layout", "-l", default="balanced", help="Layout")
+    parser.add_argument("--output", "-o", help="Output file")
+    parser.add_argument("--api-key", help="Google API Key")
     return parser.parse_args()
 
 def generate_prompt(topic, style, layout):
-    """生成 AI 绘图提示词"""
     style_prompt = STYLE_PROMPTS.get(style, STYLE_PROMPTS["cute"])
     layout_prompt = LAYOUT_PROMPTS.get(layout, LAYOUT_PROMPTS["balanced"])
     
-    prompt = f"""生成一张小红书风格的图文卡片。
-
-主题：{topic}
-
-风格：{style_prompt}
-布局：{layout_prompt}
-
-要求：
-- 高质量图片，适合社交媒体分享
-- 文字清晰可读
-- 视觉美观，有吸引力
-- 中国社交媒体（小红书）风格
-- 16:9 或 1:1 或 4:3 比例
-
-请生成图片。"""
+    prompt = f"""Xiaohongshu social media image card, topic: {topic}, style: {style_prompt}, layout: {layout_prompt}, high quality, professional design, Chinese text, vibrant colors, modern card layout"""
     
     return prompt
 
-def call_image_api(prompt, output_path, api="google"):
-    """调用 AI 生图 API"""
-    print(f"正在调用 {api} API 生成图片...")
-    print(f"提示词: {prompt[:100]}...")
+def call_imagen_api(prompt, api_key, output_path):
+    print("Calling Google Imagen API to generate image...")
     
-    # 这里是一个占位实现
-    # 实际使用时需要根据不同的 API 实现调用
+    # Use Imagen 3.0 Generate API
+    url = f"https://vision.googleapis.com/v1/projects/-/locations/us-central1:predict?key={api_key}"
     
-    if api == "google":
-        # 使用 Google Gemini API
-        api_key = os.environ.get("GOOGLE_API_KEY", "")
-        if not api_key:
-            print("警告: 未设置 GOOGLE_API_KEY 环境变量")
+    data = {
+        "instances": [{
+            "prompt": prompt
+        }],
+        "parameters": {
+            "sampleCount": 1,
+            "aspectRatio": "16:9"
+        }
+    }
+    
+    json_data = json.dumps(data).encode('utf-8')
+    
+    req = urllib.request.Request(
+        url,
+        data=json_data,
+        headers={'Content-Type': 'application/json'}
+    )
+    
+    try:
+        with urllib.request.urlopen(req, timeout=180) as response:
+            result = json.loads(response.read().decode('utf-8'))
+            print(f"Imagen response: {json.dumps(result, indent=2, ensure_ascii=False)}")
             return False
-    elif api == "openai":
-        # 使用 OpenAI API
-        api_key = os.environ.get("OPENAI_API_KEY", "")
-        if not api_key:
-            print("警告: 未设置 OPENAI_API_KEY 环境变量")
-            return False
-    elif api == "dashscope":
-        # 使用阿里云 DashScope API
-        api_key = os.environ.get("DASHSCOPE_API_KEY", "")
-        if not api_key:
-            print("警告: 未设置 DASHSCOPE_API_KEY 环境变量")
-            return False
+    except urllib.error.HTTPError as e:
+        print(f"Imagen HTTP Error: {e.code}")
+        try:
+            error_body = e.read().decode('utf-8')
+            print(f"Error: {error_body}")
+        except:
+            pass
+        return False
+
+def call_veo_api(prompt, api_key, output_path):
+    print("Calling Google Veo API to generate image...")
     
-    # TODO: 实现实际的 API 调用
-    print("提示: 这是一个骨架实现，需要配置实际的 AI 生图 API")
-    print(f"提示词已生成: {prompt}")
-    print(f"输出路径: {output_path}")
-    print(f"API: {api}")
+    # Veo is for video, let's use a different approach
+    # Try the image generation via the predict endpoint
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key={api_key}"
     
-    return True
+    data = {
+        "instances": [{
+            "prompt": prompt
+        }],
+        "parameters": {
+            "sampleCount": 1
+        }
+    }
+    
+    json_data = json.dumps(data).encode('utf-8')
+    
+    req = urllib.request.Request(
+        url,
+        data=json_data,
+        headers={'Content-Type': 'application/json'}
+    )
+    
+    try:
+        with urllib.request.urlopen(req, timeout=180) as response:
+            result = json.loads(response.read().decode('utf-8'))
+            print(f"Veo/Imagen response: {json.dumps(result, indent=2, ensure_ascii=False)}")
+            return False
+    except urllib.error.HTTPError as e:
+        print(f"Veo HTTP Error: {e.code}")
+        try:
+            error_body = e.read().decode('utf-8')
+            print(f"Error: {error_body}")
+        except:
+            pass
+        return False
+
+def call_gemini_vision(prompt, api_key, output_path):
+    """Try using Gemini with vision to describe/create an image concept"""
+    print("Using Gemini to analyze/create image concept...")
+    
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+    
+    # Ask Gemini to create a detailed image prompt
+    analysis_prompt = f"""Create a detailed prompt for an AI image generator to create a Xiaohongshu (Chinese social media) style image card.
+
+Topic: {prompt}
+
+Create a prompt that describes:
+- The visual composition
+- Colors and style
+- Text layout
+- Overall mood
+
+Respond ONLY with the image generation prompt, nothing else."""
+
+    data = {
+        "contents": [{
+            "parts": [{
+                "text": analysis_prompt
+            }]
+        }],
+        "generationConfig": {
+            "temperature": 0.9,
+            "maxOutputTokens": 1024
+        }
+    }
+    
+    json_data = json.dumps(data).encode('utf-8')
+    
+    req = urllib.request.Request(
+        url,
+        data=json_data,
+        headers={'Content-Type': 'application/json'}
+    )
+    
+    try:
+        with urllib.request.urlopen(req, timeout=60) as response:
+            result = json.loads(response.read().decode('utf-8'))
+            
+            if 'candidates' in result and len(result['candidates']) > 0:
+                candidate = result['candidates'][0]
+                if 'content' in candidate and 'parts' in candidate['content']:
+                    for part in candidate['content']['parts']:
+                        if 'text' in part:
+                            print(f"Gemini's image prompt:\n{part['text']}")
+                            return True
+            
+            print(f"Response: {json.dumps(result, indent=2)}")
+            return False
+    except Exception as e:
+        print(f"Error: {e}")
+        return False
 
 def main():
-    """主函数"""
     args = parse_args()
     
-    # 如果没有通过参数传入，尝试从 stdin 读取
+    api_key = args.api_key or os.environ.get("GOOGLE_API_KEY", "")
+    if not api_key:
+        print("Error: Please provide Google API Key")
+        sys.exit(1)
+    
     if not args.topic:
-        # 尝试从命令行参数读取
         if len(sys.argv) > 1:
-            # 查找第一个非选项参数
             for arg in sys.argv[1:]:
                 if not arg.startswith("-"):
                     args.topic = arg
                     break
         
         if not args.topic:
-            print("错误: 请提供主题内容")
-            print("用法: python script.py --topic '主题内容' --style cute --layout balanced")
+            print("Error: Please provide topic")
             sys.exit(1)
     
-    # 生成提示词
     prompt = generate_prompt(args.topic, args.style, args.layout)
+    print(f"Topic: {args.topic}")
+    print(f"Style: {args.style}")
+    print(f"Layout: {args.layout}")
+    print(f"Prompt: {prompt}")
     
-    # 确定输出路径
     if not args.output:
-        # 从主题生成文件名
-        slug = re.sub(r'[^\w\u4e00-\u9fa5]', '-', args.topic)
-        slug = slug[:20]
-        args.output = f"xhs-{slug}.png"
+        clean_topic = ''.join(c for c in args.topic if c.isalnum() or c in ' -_').strip()[:20]
+        args.output = f"xhs-{clean_topic}.png"
     
-    # 调用 API 生成图片
-    success = call_image_api(prompt, args.output, args.api)
+    print("\n--- Trying different APIs ---\n")
+    
+    # Try different approaches
+    success = call_gemini_api_v2(prompt, api_key, args.output)
     
     if success:
-        print(f"\n✅ 图片生成完成!")
-        print(f"📁 保存为: {args.output}")
+        print("\n[OK] Image generated!")
     else:
-        print("\n❌ 图片生成失败")
-        sys.exit(1)
+        print("\n[INFO] Let me try Gemini to create an image prompt...")
+        call_gemini_vision(prompt, api_key, args.output)
+        print("\n[INFO] Note: This API key may not have image generation enabled.")
+        print("Please check Google Cloud Console to enable Gemini image generation API.")
+
+def call_gemini_api_v2(prompt, api_key, output_path):
+    """Try gemini-2.5-flash-image model"""
+    print("Trying gemini-2.5-flash-image model...")
+    
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key={api_key}"
+    
+    data = {
+        "contents": [{
+            "parts": [{
+                "text": prompt
+            }]
+        }]
+    }
+    
+    json_data = json.dumps(data).encode('utf-8')
+    
+    req = urllib.request.Request(
+        url,
+        data=json_data,
+        headers={'Content-Type': 'application/json'}
+    )
+    
+    try:
+        with urllib.request.urlopen(req, timeout=180) as response:
+            result = json.loads(response.read().decode('utf-8'))
+            
+            if 'candidates' in result and len(result['candidates']) > 0:
+                candidate = result['candidates'][0]
+                if 'content' in candidate and 'parts' in candidate['content']:
+                    for part in candidate['content']['parts']:
+                        if 'inlineData' in part:
+                            image_data = part['inlineData']['data']
+                            img_bytes = base64.b64decode(image_data)
+                            with open(output_path, 'wb') as f:
+                                f.write(img_bytes)
+                            print(f"Image saved to: {output_path}")
+                            return True
+                        elif 'text' in part:
+                            print(f"Response: {part['text']}")
+            
+            print(f"Response: {json.dumps(result, indent=2)}")
+            return False
+    except urllib.error.HTTPError as e:
+        print(f"HTTP Error: {e.code}")
+        try:
+            error_body = e.read().decode('utf-8')
+            print(f"Error: {error_body}")
+        except:
+            pass
+        return False
 
 if __name__ == "__main__":
     main()
