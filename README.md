@@ -1,4 +1,4 @@
-# baoyu-xhs-images
+# xhs-x-images
 
 小红书风格图片生成器 - OpenClaw Skill 版本
 
@@ -15,14 +15,14 @@
 ## 安装
 
 ```bash
-npx clawhub install baoyu-xhs-images
+npx clawhub install xhs-x-images
 ```
 
 或手动安装：
 
 ```bash
-git clone https://github.com/Pizimous/baoyu-xhs-images.git
-cd baoyu-xhs-images
+git clone https://github.com/Pizimous/xhs-x-images.git
+cd xhs-x-images
 ```
 
 ## 配置
@@ -110,7 +110,7 @@ python script.py --topic "AI工具推荐" --style notion --layout list
 ### 项目结构
 
 ```
-baoyu-xhs-images/
+xhs-x-images/
 ├── SKILL.md          # Skill 元数据和说明
 ├── script.py         # 主程序
 └── README.md         # 本文件

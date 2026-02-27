@@ -1,5 +1,5 @@
 ---
-name: baoyu-xhs-images
+name: xhs-x-images
 description: 生成小红书风格的图文卡片。支持多种视觉风格和布局，用于社交媒体内容创作。
 version: 1.0.0
 author: Pizimous (基于 baoyu-skills 改造)
@@ -10,7 +10,7 @@ tags:
   - chinese
 ---
 
-# baoyu-xhs-images
+# xhs-x-images
 
 生成小红书（XHS）风格的图文卡片。
 
